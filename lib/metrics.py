@@ -15,11 +15,7 @@ def mean_absolute_percentage_error(y_pred,y_true):
 def get_MSE(pred,real):
     return np.mean(np.power(real-pred,2))
 def get_MAE(pred,real):
-    # print('真实值')
-    # print(pred.shape)#(537, 80, 80),(537, 80, 1, 80),(538, 1, 80, 80),(539, 80, 80, 1)
-    # print(real.shape)#(537, 80, 80),(537, 80, 1, 80),(538, 1, 80, 80),(539, 80, 80, 1)
-    # print(real[33][0])
-    # print(real[111][0])
+
     return np.mean(np.abs(real-pred))
 
 def get_RMSE(pred,real):
@@ -52,11 +48,7 @@ def masked_mse_np(preds, labels, null_val=np.nan):
 
 
 def masked_mae_np(preds, labels, null_val=np.nan, mode='dcrnn'):
-    # print('真实值')
-    # print(preds.shape)
-    # print(labels.shape)
-    # print(labels[333][1])
-    # print(labels[578][1])
+
     with np.errstate(divide='ignore', invalid='ignore'):
         if np.isnan(null_val):
             mask = ~np.isnan(labels)

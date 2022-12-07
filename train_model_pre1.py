@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Thu Apr 25 15:12:27 2019
-
-@author: gk
-"""
 
 import os
 import random
@@ -28,7 +23,7 @@ from model.model_pre1 import Net_block as model
 # os.environ['CUDA_VISIBLE_DEVICES'] = '0,1,2,3'
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--device', type=str, default='cuda:4', help='')
+parser.add_argument('--device', type=str, default='cuda:2', help='')
 parser.add_argument('--batch_size', type=int, default=16, help='Batch Size during training [default: 16]')
 parser.add_argument('--decay', type=float, default=0.92, help='decay rate of learning rate ')
 FLAGS = parser.parse_args()
@@ -53,28 +48,23 @@ print('read matrix')
 # read matrix
 adj_mx_list=[]
 adj1 = './data/nyc_adj.pkl'
-adj_mx1 = load_graph_data_hz(adj1)  # (80, 80)
+adj_mx1 = load_graph_data_hz(adj1)
 # print(adj_mx1.shape)
 for i in range(len(adj_mx1)):
     adj_mx1[i, i] = 0
-adj_mx_list.append(adj_mx1)  # (1,80,80)
+adj_mx_list.append(adj_mx1)
 
-adj_mx = np.stack(adj_mx_list, axis=-1)#(80,80,3)
+adj_mx = np.stack(adj_mx_list, axis=-1)
 # print(adj_mx.shape)
-adj_mx = adj_mx / (adj_mx.sum(axis=0) + 1e-18)  #(80, 80, 3)#进行row normalization
-src, dst = adj_mx.sum(axis=-1).nonzero()   #原站点：(3214,),目的地：(3214,),
-# print(src) #[ 0  0  0 ... 79 79 79]
-# print(dst)  #[ 1  2  3 ... 76 77 78]
-# print(src.shape) #(3214,)
-# print(dst.shape)  #(3214,)
-edge_index = torch.tensor([src, dst], dtype=torch.long, device=device)   #torch.Size([2, 3214])
-# print('2345')
-# print(edge_index.shape)
+adj_mx = adj_mx / (adj_mx.sum(axis=0) + 1e-18)
+src, dst = adj_mx.sum(axis=-1).nonzero()
+
+edge_index = torch.tensor([src, dst], dtype=torch.long, device=device)
 edge_attr = torch.tensor(adj_mx[adj_mx.sum(axis=-1) != 0],
                          dtype=torch.float,
-                         device=device)   ##torch.Size([3214, 3])
-print(edge_attr.shape)#torch.Size([3])
-print(edge_attr[0].shape)#torch.Size([3])
+                         device=device)
+print(edge_attr.shape)
+print(edge_attr[0].shape)
 
 Metro_edge_matrix = np.load('./data/npy2018_data_1hour.npy')  #
 Metro_week_matrix = np.load('./data/ext2018_week_Matrix.npy')  #
@@ -180,10 +170,7 @@ if __name__ == "__main__":
 
     # get model's structure
     net = model(device,edge_index,edge_attr)
-    # if torch.cuda.device_count() > 1:
-    #     print("Let's use", torch.cuda.device_count(), "GPUs!")
-    #     # dim = 0 [30, xxx] -> [10, ...], [10, ...], [10, ...] on 3 GPUs
-    #     net = nn.DataParallel(net)
+
     net.to(device)  # to cuda
     scaler = scaler
     scaler_torch = StandardScaler_Torch(scaler.mean, scaler.std, device=device)
@@ -199,28 +186,28 @@ if __name__ == "__main__":
         start_time_train = time()
         for train_w, train_d, train_r, train_t,train_w_toweek,train_w_tohour, train_d_toweek,train_d_tohour, \
             train_r_toweek,train_r_tohour in train_loader:
-            train_w = train_w.to(device)#
-            train_d = train_d.to(device)#
-            train_r = train_r.to(device)#
-            train_t = train_t.to(device)#t
-            train_w_toweek = train_w_toweek.to(device)  # torch.Size([16, T, 7])
-            train_w_tohour = train_w_tohour.to(device)  # torch.Size([16, T, 108])
-            train_d_toweek = train_d_toweek.to(device)  # torch.Size([16, T, 7])
-            train_d_tohour = train_d_tohour.to(device)  # torch.Size([16, T, 108])
-            train_r_toweek = train_r_toweek.to(device)  # torch.Size([16, T, 7])
-            train_r_tohour = train_r_tohour.to(device)  # torch.Size([16, T, 108])
+            train_w = train_w.to(device)
+            train_d = train_d.to(device)
+            train_r = train_r.to(device)
+            train_t = train_t.to(device)
+            train_w_toweek = train_w_toweek.to(device)
+            train_w_tohour = train_w_tohour.to(device)
+            train_d_toweek = train_d_toweek.to(device)
+            train_d_tohour = train_d_tohour.to(device)
+            train_r_toweek = train_r_toweek.to(device)
+            train_r_tohour = train_r_tohour.to(device)
             net.train()  # train pattern
             optimizer.zero_grad()  # grad to 0
             output = net([train_w, train_d, train_r],
                          [train_w_toweek,train_w_tohour, train_d_toweek,train_d_tohour,train_r_toweek,train_r_tohour])
-            output = scaler_torch.inverse_transform(output)  # 是将标准化后的数据转换为原始数据  #torch.Size([16, 80, 80, 6])
-            train_t = scaler_torch.inverse_transform(train_t)  # torch.Size([16, 80, 80, 6])
+            output = scaler_torch.inverse_transform(output)
+            train_t = scaler_torch.inverse_transform(train_t)
 
 
             loss = loss_function(output, train_t)
-            # backward p
+
             loss.backward()
-            # torch.nn.utils.clip_grad_norm_(net.parameters(), clip)
+
 
             # update parameter
             optimizer.step()
@@ -234,8 +221,7 @@ if __name__ == "__main__":
               % (epoch, train_l, end_time_train - start_time_train))
         train_time.append(end_time_train - start_time_train)
 
-        # compute validation loss
-        # print('compute_val_loss')
+
         valid_loss, val_mae, val_rmse = compute_val_loss(net, val_loader,true_val_value, loss_function,device, epoch,scaler)
 
         his_mae.append(val_mae)
@@ -263,16 +249,6 @@ if __name__ == "__main__":
     evaluate(net, test_loader, true_value, device, epoch,scaler)
     test_time = np.mean(end_time_test - start_time_test)
     print("Test time: %.2f" % test_time)
-
-    # print('model_xiu2中')
-
-
-
-    # prediction = scaler_torch.inverse_transform(prediction)  # 是将标准化后的数据转换为原始数据  #(316, 80, 80, 6)
-    # true_value = scaler_torch.inverse_transform(true_value)  # (316, 80, 80, 6)
-    #
-    # np.save('model_prediction_pre1', prediction)
-    # np.save('model_true_value_pre1', true_value)
 
 
 

@@ -1,14 +1,10 @@
 import pickle
 
-import numpy as np
-import csv
+
 import numpy as np
 from scipy.sparse.linalg import eigs
 import torch
-# from metrics import mean_absolute_error, mean_squared_error, masked_mape_np
-# from lib.metrics import *
-# from metrics import *
-# from baseMay_pre6.lib.metrics import mean_absolute_percentage_error, get_MAE, get_RMSE
+
 
 
 
@@ -19,11 +15,7 @@ def mean_absolute_percentage_error(y_pred,y_true):
 def get_MSE(pred,real):
     return np.mean(np.power(real-pred,2))
 def get_MAE(pred,real):
-    # print('真实值')
-    # print(pred.shape)#(388, 80, 80)
-    # print(real.shape)#(388, 80, 80)
-    # print(real[33][1])
-    # print(real[111][1])
+
     return np.mean(np.abs(real-pred))
 
 def get_RMSE(pred,real):
@@ -127,11 +119,9 @@ def evaluate(net, test_loader, true_value, device, epoch,scaler):
     net.eval()
     with torch.no_grad():
         prediction= predict(net, test_loader,device)
-        prediction = scaler_torch.inverse_transform(prediction)  # 是将标准化后的数据转换为原始数据  #(316, 80, 80, 6)
-        true_value = scaler_torch.inverse_transform(true_value)  # (316, 80, 80, 6)
-        # print('prediction')
-        # print(prediction.shape)
-        # print(true_value.shape)
+        prediction = scaler_torch.inverse_transform(prediction)
+        true_value = scaler_torch.inverse_transform(true_value)
+
 
         mae = get_MAE(prediction, true_value)
         rmse = get_RMSE(prediction, true_value)
@@ -213,11 +203,9 @@ def compute_val_loss(net, val_loader,true_val_value, loss_function,device, epoch
     net.eval()
     with torch.no_grad():
         prediction= predict(net, val_loader, device)
-        prediction = scaler_torch.inverse_transform(prediction)  # 是将标准化后的数据转换为原始数据  #(316, 80, 80, 6)
-        true_value = scaler_torch.inverse_transform(true_val_value)  # (316, 80, 80, 6)
-        # print('############')
-        # print(prediction.shape)
-        # print(true_value.shape)
+        prediction = scaler_torch.inverse_transform(prediction)
+        true_value = scaler_torch.inverse_transform(true_val_value)
+
 
         mae = get_MAE(prediction, true_value)
         rmse = get_RMSE(prediction, true_value)
@@ -241,8 +229,7 @@ def compute_val_loss(net, val_loader,true_val_value, loss_function,device, epoch
                     val_d_toweek,val_d_tohour,val_r_toweek,val_r_tohour])
             output = scaler_torch.inverse_transform(output)  # 是将标准化后的数据转换为原始数据
             val_t = scaler_torch.inverse_transform(val_t)
-            # print('output')
-            # print(output.shape)
+
             l = loss_function(output, val_t)
             tmp.append(l.item())
 
@@ -318,7 +305,7 @@ def search_data(sequence_length, num_of_batches, label_start_idx,
     if len(x_idx) != num_of_batches:
         return None
 
-    return x_idx[::-1]#倒叙输出,符合时间的 顺序输出,这里不占用多少空间
+    return x_idx[::-1]
 
 def search_datah(sequence_length, num_of_batches, label_start_idx,
                 num_for_predict, units, points_per_hour):
@@ -341,7 +328,7 @@ def search_datah(sequence_length, num_of_batches, label_start_idx,
     if len(x_idx) != num_of_batches:
         return None
 
-    return x_idx[::-1]#倒叙输出,符合时间的 顺序输出,这里不占用多少空间
+    return x_idx[::-1]
 
 def get_sample_indices(data_sequence,Metro_week_matrix,Metro_hour_matrix, num_of_weeks, num_of_days, num_of_hours,
                        label_start_idx, num_for_predict, points_per_hour=12):
@@ -483,21 +470,7 @@ def read_and_generate_dataset(Metro_edge_matrix,Metro_week_matrix,Metro_hour_mat
     train_target, val_target, test_target = scaler.transform(train_target), scaler.transform(
         val_target), scaler.transform(test_target)
 
-    #----------------------------################
-    # train_week_norm, val_week_norm, test_week_norm = train_week, val_week, test_week
-    # train_day_norm, val_day_norm, test_day_norm = train_day,val_day,test_day
-    # train_recent_norm, val_recent_norm, test_recent_norm = train_hour,val_hour,test_hour
-    # train_target, val_target, test_target = train_target, val_target,test_target
-    # print('##########3333#########')
-    # print(val_target.shape)
-    # # print(prediction.shape)
-    # print('------real,timestep=42,station15-station9-----')
-    # print(val_target[42][15][9])
-    # print('------prediction,timestep=42,station15-station9-----')
-    # print(test_target[42][15][9])
-    # print('------real,timestep=108,station15-station9-----')
-    # print(val_recent_norm[108][15][9])
-    # print('------prediction,timestep=108,station15-station9-----')
+
 
     all_data = {
         'train': {
@@ -536,11 +509,7 @@ def read_and_generate_dataset(Metro_edge_matrix,Metro_week_matrix,Metro_hour_mat
             'recent_toweek': test_hour_toweek,
             'recent_tohour': test_hour_tohour
         },
-        # 'stats': {
-        #     'week': week_stats,
-        #     'day': day_stats,
-        #     'recent': recent_stats
-        # }
+
     }
 
     return all_data,scaler

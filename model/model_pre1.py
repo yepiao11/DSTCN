@@ -1,9 +1,5 @@
 # -*- coding: utf-8 -*-
-"""
-Created on Sun Oct  7 11:21:28 2018
 
-@author: gk
-"""
 from functools import partial
 
 import numpy as np
@@ -16,11 +12,6 @@ from torch.autograd import Variable
 import sys
 from torch.nn import BatchNorm2d, Conv1d, Conv2d, ModuleList, Parameter, LayerNorm, InstanceNorm2d
 
-"""
-Created on Mon Aug 20 13:20:23 2018
-
-@author: gk
-"""
 import numpy as np
 import torch
 import torch.nn as nn
@@ -91,7 +82,7 @@ class RGCNConv(MessagePassing):
         torch.nn.init.xavier_uniform_(self.att)
         torch.nn.init.xavier_uniform_(self.root)
 
-    def forward(self, x, edge_index, edge_attr, edge_norm=None): #inputs=[640,2],  edge_index:torch.Size([2, 25712]),edge_attr=torch.Size([25712,3])
+    def forward(self, x, edge_index, edge_attr, edge_norm=None):
         """"""
         return self.propagate(
             edge_index, x=x, edge_attr=edge_attr, edge_norm=edge_norm)
@@ -126,30 +117,30 @@ class KStepRGCN(nn.Module):
 
     def __init__(
             self,
-            in_channels,  #80
-            out_channels,  #256
-            num_relations,   #3
-            num_bases,  #3
-            K, #1
-            bias, #False
+            in_channels,
+            out_channels,
+            num_relations,
+            num_bases,
+            K,
+            bias,
     ):
         super(KStepRGCN, self).__init__()
-        self.in_channels = in_channels   #80
-        self.out_channels = out_channels  #256
-        self.num_relations = num_relations    #3
-        self.num_bases = num_bases #3
-        self.K = K  #1
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.num_relations = num_relations
+        self.num_bases = num_bases
+        self.K = K
         self.rgcn_layers = nn.ModuleList([
-            RGCNConv(in_channels,  #80
-                     out_channels,  #256
-                     num_relations,  #3
-                     num_bases,  #3
-                     bias)  #False
+            RGCNConv(in_channels,
+                     out_channels,
+                     num_relations,
+                     num_bases,
+                     bias)
         ] + [
-            RGCNConv(out_channels,   #256*3
-                     out_channels,  #256*3
-                     num_relations,   #3
-                     num_bases,   #3
+            RGCNConv(out_channels,
+                     out_channels,
+                     num_relations,
+                     num_bases,
                      bias) for _ in range(self.K - 1)
         ])
 
@@ -157,10 +148,7 @@ class KStepRGCN(nn.Module):
     def forward(self, x, edge_index, edge_attr):
         edge_index=edge_index.to(x.device)
         edge_attr=edge_attr.to(x.device)
-        # print('###')
-        # print(x.shape)#torch.Size([1280, 80])
-        # print(edge_index.shape)#torch.Size([2, 3214])
-        # print(edge_attr.shape)#torch.Size([3214, 3])
+
         for i in range(self.K):
             x = self.rgcn_layers[i](x=x,
                                     edge_index=edge_index,
@@ -169,8 +157,7 @@ class KStepRGCN(nn.Module):
             # not final layer, add relu
             if i != self.K - 1:
                 x = torch.relu(x)
-        # print('1234')
-        # print(x.shape)  #torch.Size([1280, 256])
+
         return x
 
 class Mlp(nn.Module):
@@ -183,20 +170,12 @@ class Mlp(nn.Module):
         self.fc2 = nn.Linear(hidden_features, out_features)
         self.drop = nn.Dropout(drop)
 
-    def forward(self, x):#torch.Size([16, 197, 384])
-        # print('Mlp')
-        # print(x.shape)
-        x = self.fc1(x)#torch.Size([16, 197, 1536])
-        # print(x.shape)
-        x = self.act(x)#torch.Size([16, 197, 1536])
-        # print(x.shape)
-        x = self.drop(x)#torch.Size([16, 197, 1536])
-        # print('xxxxx')
-        # print(x.shape)
-        x = self.fc2(x)#torch.Size([16, 197, 384])
-        # print(x.shape)
-        x = self.drop(x)#torch.Size([16, 197, 384])
-        # print(x.shape)
+    def forward(self, x):
+        x = self.fc1(x)
+        x = self.act(x)
+        x = self.drop(x)
+        x = self.fc2(x)
+        x = self.drop(x)
         return x
 
 
@@ -213,31 +192,22 @@ class Attention(nn.Module):
         self.proj = nn.Linear(dim, dim)
         self.proj_drop = nn.Dropout(proj_drop)
 
-    def forward(self, x):#torch.Size([16, 197, 384])
-        # print('Attention')
-        # print(x.shape)
+    def forward(self, x):
         B, N, C = x.shape
-        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)#torch.Size([3, 16, 6, 197, 64])
-        # print(qkv.shape)
-        q, k, v = qkv[0], qkv[1], qkv[2]  # make torchscript happy (cannot use tensor as tuple)
-        # print('q,k')
-        # print(q.shape)#torch.Size([16, 6, 197, 64])
+        qkv = self.qkv(x).reshape(B, N, 3, self.num_heads, C // self.num_heads).permute(2, 0, 3, 1, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]
 
-        attn = (q @ k.transpose(-2, -1)) * self.scale#torch.Size([16, 6, 197, 197])
-        # print(attn.shape)
-        attn = attn.softmax(dim=-1)#torch.Size([16, 6, 197, 197])
-        # print(attn.shape)
-        attn = self.attn_drop(attn)#torch.Size([16, 6, 197, 197])
-        # print('attn')
-        # print(attn.shape)
+        attn = (q @ k.transpose(-2, -1)) * self.scale
 
-        x = (attn @ v).transpose(1, 2).reshape(B, N, C)#torch.Size([16, 197, 384])
-        # print(x.shape)
-        x = self.proj(x)#torch.Size([16, 197, 384])
-        # print(x.shape)
-        x = self.proj_drop(x)#torch.Size([16, 197, 384])
-        # print('567890-')
-        # print(x.shape)
+        attn = attn.softmax(dim=-1)
+
+        attn = self.attn_drop(attn)
+
+        x = (attn @ v).transpose(1, 2).reshape(B, N, C)
+
+        x = self.proj(x)
+
+        x = self.proj_drop(x)
         return x
 
 class Block(nn.Module):
@@ -254,15 +224,12 @@ class Block(nn.Module):
         mlp_hidden_dim = int(dim * mlp_ratio)
         self.mlp = Mlp(in_features=dim, hidden_features=mlp_hidden_dim, act_layer=act_layer, drop=drop)
 
-    def forward(self, x):#torch.Size([16, 197, 384])
-        # print('Block')
-        # print(x.shape)
-        x = x + self.drop_path(self.attn(self.norm1(x)))#torch.Size([16, 197, 384])
-        # print('x1')
-        # print(x.shape)
-        x = x + self.drop_path(self.mlp(self.norm2(x)))#torch.Size([16, 197, 384])
-        # print('x2')
-        # print(x.shape)
+    def forward(self, x):
+
+        x = x + self.drop_path(self.attn(self.norm1(x)))
+
+        x = x + self.drop_path(self.mlp(self.norm2(x)))
+
         return x
 
 
@@ -278,22 +245,16 @@ class GRU(nn.Module):
         self.c_out = c_out
         self.bn = BatchNorm2d(c_in, affine=False)
 
-    def forward(self, x1):## torch.Size([16, 30, 7]),# torch.Size([16, 30, 108])
+    def forward(self, x1):##
 
         # print('h')
-        shape = x1.shape#torch.Size([16, 80, 80, 30])
+        shape = x1.shape
         B=shape[0]
-        # print(x.shape)
-        h = Variable(torch.zeros(1, shape[0] * shape[2], self.c_out,dtype=x1.dtype,device=x1.device))#torch.Size([1, 1280, 256])
-        # print(h.shape)
-        hidden = h#torch.Size([1, 1280, 256])
-        # print(hidden.shape)
-        x = x1.permute(0, 2, 3, 1).contiguous().view(shape[0] * shape[2], shape[3], shape[1])#torch.Size([1280, 6, 80]),torch.Size([1280, 30, 256])
-        # print(x.shape)
-        x, hidden = self.gru(x, hidden)#torch.Size([1280, 6, 256]),torch.Size([1280, 30, 256])
-        # print('68790-')
-        # print(x.shape)
-        x = x.view(shape[0], shape[2], shape[3], self.c_out).permute(0, 3, 1, 2).contiguous()#torch.Size([16, 256, 80, 30])
+        h = Variable(torch.zeros(1, shape[0] * shape[2], self.c_out,dtype=x1.dtype,device=x1.device))
+        hidden = h
+        x = x1.permute(0, 2, 3, 1).contiguous().view(shape[0] * shape[2], shape[3], shape[1])
+        x, hidden = self.gru(x, hidden)
+        x = x.view(shape[0], shape[2], shape[3], self.c_out).permute(0, 3, 1, 2).contiguous()
         return x
 
 class Model(nn.Module):
@@ -366,113 +327,84 @@ class Model(nn.Module):
                                 bias=False)
         self.gcn_h_fc = nn.Linear(numT, 2 * D)
         self.mlp_h = nn.Linear(4 * D, 2 * D)
-        # self.register_buffer('my_buffer', self.edge_index)
-        # self.register_buffer('my_buffer', self.edge_attr)
+
         self.fc_toweek = nn.Linear(numT*7, 768)
         self.fc_tohour = nn.Linear(numT*24 , 768)
-        # self.W1 = nn.Parameter(torch.FloatTensor(289, embed_dim).to(device))
-        # self.W2 = nn.Parameter(torch.FloatTensor(289, embed_dim).to(device))
-        # self.simformer_1 = nn.Linear(numT, D)
-        # self.norm2 = nn.LayerNorm(embed_dim)
         self.simformer_1 = nn.Linear(numT, D)
         self.norm2 = nn.LayerNorm(D)
 
 
 
     def forward(self, x_f,external_toweek, external_tohour):
-        # print('external_toweek')
-        # print(external_toweek.shape)#torch.Size([16, 6, 7])
-        # print(external_toweek[0][0])
-        external_toweek=external_toweek.flatten(1)#torch.Size([16, 6*7])
+        external_toweek=external_toweek.flatten(1)#
 
-        # print(external_toweek.shape)
-        external_toweek = self.fc_toweek(F.relu(external_toweek))  # torch.Size([16, 7])--->torch.Size([16,768]
-        # print(external_toweek.shape)
+        external_toweek = self.fc_toweek(F.relu(external_toweek))  #
         B,E=external_toweek.shape
-        external_toweek = external_toweek.expand(289,B,E)  # torch.Size([16,768]--->torch.Size([16,1,768]
-        # print(external_toweek.shape)
-        external_toweek=external_toweek.permute(1,0,2)#(16,289,768)
-        # print(external_toweek.shape)
-        # print('external_tohour')
-        # print(external_toweek.shape)#torch.Size([16, 6, 108])
+        external_toweek = external_toweek.expand(289,B,E)  #
+        external_toweek=external_toweek.permute(1,0,2)#
 
-        external_tohour=external_tohour.flatten(1)#torch.Size([16, 108])
-        # print(external_tohour[0])
-        # print(external_tohour.shape)
-        external_tohour = self.fc_tohour(F.relu(external_tohour))  # torch.Size([16, 7*T])--->torch.Size([16,768]
-        # print(external_tohour.shape)
+        external_tohour=external_tohour.flatten(1)
+        external_tohour = self.fc_tohour(F.relu(external_tohour))  #
+
         external_tohour = external_tohour.expand(289,B,E)
-        # print(external_tohour.shape)
+
         external_tohour=external_tohour.permute(1,0,2)
         x=x_f
-        B,H,W,C=x.shape#B=16, H=80, W=80, C=256 
+        B,H,W,C=x.shape#
 
         if self.with_vertical:
             # print('vvvv')
-            v = x.permute(0, 2, 1, 3)  # (B, H, W, C)--->(B,W,H,C),torch.Size([16, 80, 80, T])-->torch.Size([16, 80, 80, T])
+            v = x.permute(0, 2, 1, 3)
             # print(v.shape)
-            v1 = v.reshape(-1, H, C)  # (B,W,H,C)-->(B*W,H,C),torch.Size([16, T, 80, 80])-->torch.Size([16*80, 80, T])
+            v1 = v.reshape(-1, H, C)
             # print(v.shape)
-            v, _ = self.rnn_v(v1)  # (B*W,H,2C),torch.Size([16*80, 80, 512])
-            # print(v.shape)
-            # v, _ = self.rnn_v1(v)# (B*W,H,2C),torch.Size([16*80, 80, 60])
-            # print(v.shape)
-            v = v.reshape(B, W, H, -1)  # (B*W,H,2C)-->(B,W,H,2C),torch.Size([16*80, 80, 2C])-->torch.Size([16,80, 80, 2C])
-            v = v.permute(0, 2, 1, 3)  # (B,W,H,2C)--->(B,H,W,2C)#torch.Size([16,80, 80, 2C])-->torch.Size([16,80,80,2C])
-            # print(v.shape)
+            v, _ = self.rnn_v(v1)
+            v = v.reshape(B, W, H, -1)
+            v = v.permute(0, 2, 1, 3)
+
             #加入图卷积去更新
             need_concat_v = []
-            for i in range(self.numT):#12
-                h_v = self.cheb_v(v1[:, :, i], edge_index=self.edge_index,
-                                  edge_attr=self.edge_attr)  #torch.Size([16*80, 80, T])--->torch.Size([16*80, 80])
-                # print(h_v.shape)#torch.Size([1280, 80])
+            for i in range(self.numT):
+                h_v = self.cheb_v(v1[:, :, i], edge_index=self.edge_index,edge_attr=self.edge_attr)
                 need_concat_v.append(h_v)
-            gcn_v = torch.stack(need_concat_v, dim=-1)  # torch.Size([16*80, 80,T])
-            # print('gcn_v')
-            # print(gcn_v.shape)
-            gcn_v = gcn_v.reshape(B, W, H, -1)#torch.Size([16, 80, 80, 12])
-            # print(gcn_v.shape)
+            gcn_v = torch.stack(need_concat_v, dim=-1)
+
+            gcn_v = gcn_v.reshape(B, W, H, -1)
+
             gcn_v = gcn_v.permute(0, 2, 1, 3)
-            gcn_v=self.gcn_v_fc(gcn_v)# torch.Size([16,80, 80,256*2])
-            # print(gcn_v.shape)
+            gcn_v=self.gcn_v_fc(gcn_v)#
+
             #融合双向lstm和gcn
-            combine_v= torch.cat([v, gcn_v], dim=-1)  ##torch.Size([16, 80,80,512*2])
-            # print('combine1')
-            # print(combine_v.shape)
-            v = v+v * torch.tanh(self.mlp_v(combine_v))#torch.Size([16, 80,80,512])
-            # print(v.shape)
+            combine_v= torch.cat([v, gcn_v], dim=-1)  #
+
+            v = v+v * torch.tanh(self.mlp_v(combine_v))
+
         if self.with_horizontal:
-            # print('rtyuio')
-            h1 = x.reshape(-1, W, C)#(B, H, W, C)-->(B*H, W, C),torch.Size([16, 80, 80, T])--->#torch.Size([16*80, 80, T])
+
+            h1 = x.reshape(-1, W, C)
             # print(h.shape)
-            h, _ = self.rnn_h(h1)#(B*H, W, 2C),#torch.Size([16*80, 80, 512])
+            h, _ = self.rnn_h(h1)
             # h, _ = self.rnn_h1(h)
             # print(h.shape)
-            h = h.reshape(B, H, W, -1)#(B*H, W, 2C)--->(B,H, W, 2C),torch.Size([16*80, 80, 512])--->torch.Size([16,80,80, 512])
+            h = h.reshape(B, H, W, -1)#
             # print(h.shape)
             # 加入图卷积去更新
             need_concat_h = []
             for i in range(self.numT):  # 12
-                h_h = self.cheb_h(h1[:, :, i], edge_index=self.edge_index,
-                                  edge_attr=self.edge_attr)  # torch.Size([16*80, 80, T])--->torch.Size([16*80, 80])
-                # print(h_v.shape)#torch.Size([1280, 80])
+                h_h = self.cheb_h(h1[:, :, i], edge_index=self.edge_index,edge_attr=self.edge_attr)
+
                 need_concat_h.append(h_h)
-            gcn_h = torch.stack(need_concat_h, dim=-1)  # torch.Size([16*80, 80,T])
-            # print('gcn_h')
-            # print(gcn_h.shape)
-            gcn_h= gcn_h.reshape(B, H,W, -1)  # torch.Size([16, 80, 80, 12])
-            # print(gcn_h.shape)
-            gcn_h = self.gcn_h_fc(gcn_h)  # torch.Size([16,80, 80,256*2])
-            # print(gcn_h.shape)
+            gcn_h = torch.stack(need_concat_h, dim=-1)  #
+            gcn_h= gcn_h.reshape(B, H,W, -1)
+            gcn_h = self.gcn_h_fc(gcn_h)
             # 融合双向lstm和gcn
-            combine_h = torch.cat([h, gcn_h], dim=-1)  ##torch.Size([16, 80,80,512*2])
-            # print('combine')
-            # print(combine_h.shape)
-            h = h+h * torch.tanh(self.mlp_h(combine_h))  # torch.Size([16, 80,80,512])
+            combine_h = torch.cat([h, gcn_h], dim=-1)
+
+            h = h+h * torch.tanh(self.mlp_h(combine_h))
             # print(h.shape)
         if self.with_vertical and self.with_horizontal:
             if self.union == "cat":
-                x = torch.cat([v, h], dim=-1)#(B,H, W, 4C)#torch.Size([16, 80, 80, 1024])
+                x = torch.cat([v, h], dim=-1)
                 # print('cat')
                 # print(x.shape)
             else:
@@ -483,58 +415,27 @@ class Model(nn.Module):
             x = h
         # print('76890')
         # print(x.shape)
-        x_bilstm = self.fc(x)##torch.Size([16,80, 80, 4C])-->#torch.Size([16,80, 80, C]),torch.Size([16, 80, 80, 256])
+        x_bilstm = self.fc(x)
         # print(x_bilstm.shape)
         #在这里我感觉可以进行一下空间transformer
-        x1 = x_f.permute(0, 3, 1, 2)  #torch.Size([16, 6, 69, 69])
-        # print('67890')
-        # print(x1.shape)
-        x = self.act1(self.bn1(self.conv(x1)))  # torch.Size([16,30,80,80])---->torch.Size([16, 256, 34, 34])
-        # print('90-')
-        # print(x.shape)
-        x = self.trans_patch_conv(x).flatten(2).transpose(1, 2)  # torch.Size([16, 289, 768])
-        # print(x.shape)
-        # cls_tokens = self.cls_token.expand(B, -1, -1)  # torch.Size([16, 1, 768])，torch.Size([16, 1, 768])
-        # print(self.W1.shape)
-        # print(self.W2.shape)
-        x_t = x+F.relu(external_toweek+external_tohour)  #torch.Size([16, 400+2, 768])
-        # print('xiio')
-        # print(x_t.shape)
-        x_t = self.trans_block(x_t)  # torch.Size([16, 291, 768]),讲x_st和全局加起来去做transformer
-        # print('x_t')
-        # print(x_t.shape)#torch.Size([16, 291, 768])
-        # x_t = x_t[:,2 :, :]#torch.Size([16, 289, 768])
-        # print(x_t.shape)
-        x_t = x_t.view(-1, 17, 17, 768).permute(0, 3, 1, 2)  # torch.Size([16, 768, 17, 17])
-        # print('7890')
-        # print(x_t.shape)#torch.Size([16, 768, 14, 14]),torch.Size([16, 768, 20, 20])
-        x_t = self.unconv1(x_t)  #torch.Size([16, 256, 68, 68])
-        # print(x_t.shape)
+        x1 = x_f.permute(0, 3, 1, 2)
+        x = self.act1(self.bn1(self.conv(x1)))
+        x = self.trans_patch_conv(x).flatten(2).transpose(1, 2)
+        x_t = x+F.relu(external_toweek+external_tohour)
+        x_t = self.trans_block(x_t)
+        x_t = x_t.view(-1, 17, 17, 768).permute(0, 3, 1, 2)
+        x_t = self.unconv1(x_t)
         x_t = self.unconv2(x_t)
-        # print(x_t.shape)
-        x_t = self.conv_shape(x_t)  # torch.Size([16, 256, 69, 69])
-        # print(x_t.shape)
-        x_t = x_t.permute(0, 2, 3, 1)#torch.Size([16, 69, 69, 256])
-        # print(x_t.shape)
-        # print('simformer_1')
-        # print(x_f.shape)
-        # print(self.simformer_1(x_f).shape)
+        x_t = self.conv_shape(x_t)
+        x_t = x_t.permute(0, 2, 3, 1)
         x_t = self.simformer_1(x_f) + x_t
-        # print(x_t.shape)
-        # print('88889789')
         x_t = self.norm2(x_t)
         #融合双向lstm和全局transformer
-        combine_hidden = torch.cat([x_bilstm,x_t], dim=-1)  ##torch.Size([16, 80,80,512])
-        # print(combine_hidden.shape)
+        combine_hidden = torch.cat([x_bilstm,x_t], dim=-1)
         next_hidden = x_bilstm * torch.tanh(self.mlpatt(combine_hidden))
-
-        x = self.f2(next_hidden)  # torch.Size([16,80, 80, C])--->torch.Size([16, 69, 69, T])
-        # print('7890-')
-        # print(x.shape)
+        x = self.f2(next_hidden)
         # 加入GRU
-        x = self.GRU(x)  ##torch.Size([16, 256, 80, T]),torch.Size([16, 256, 80, T])
-        # print('jihuo')
-        # print(x.shape)
+        x = self.GRU(x)
         return x
 
 
@@ -563,63 +464,30 @@ class Net_block(torch.nn.Module):
     def forward(self,x_list,external_list):
         # 加载data数据
         x_w, x_d, x_r = x_list[0], x_list[1], x_list[
-            2]  # torch.Size([16, 80, 80, T]),torch.Size([16, 80, 80, T]),torch.Size([16, 80, 80, T])
-        # print('ghj')
-        # print(x_w.shape)#torch.Size([16, 69, 69, 2])
-        # print(x_d.shape)#torch.Size([16, 69, 69, 1])
-        # print(x_r.shape)#torch.Size([16, 69, 69, 3])
+            2]
         ext_w_toweek, ext_w_tohour,ext_d_toweek, ext_d_tohour,ext_r_toweek, ext_r_tohour= \
-            external_list[0], external_list[1],external_list[2], external_list[3],external_list[4], external_list[5]  # torch.Size([16, 6, 7]),torch.Size([16, 6, 108])
-        # print('ext_w_toweek')
-        # print(ext_w_toweek.shape)#torch.Size([16, 2, 7])
-        # print(ext_w_tohour.shape)#torch.Size([16, 2, 24])
-        # print(ext_d_toweek.shape)#torch.Size([16, 1, 7])
-        # print(ext_d_tohour.shape)#torch.Size([16, 1, 24])
-        # print(ext_r_toweek.shape)#torch.Size([16, 3, 7])
-        # print(ext_r_tohour.shape)#torch.Size([16, 3, 24])
-        x_w = self.bn(x_w)#torch.Size([16, 80, 80, 2])
-        x_d = self.bn(x_d)#torch.Size([16, 80, 80, 6])
-        x_r = self.bn(x_r)#torch.Size([16, 80, 80, 6])
-        # print('xxx')
-        # print(x_w.shape)
-        # print(x_d.shape)
-        # print(x_r.shape)
+            external_list[0], external_list[1],external_list[2], external_list[3],external_list[4], external_list[5]
+        x_w = self.bn(x_w)
+        x_d = self.bn(x_d)
+        x_r = self.bn(x_r)
         x = torch.cat((x_w, x_d, x_r), -1)
-        # print(x.shape)#torch.Size([16, 69, 69, 6])
-        ext_toweek=torch.cat((ext_w_toweek,ext_d_toweek,ext_r_toweek),1)#torch.Size([16, 6, 7])
-        ext_tohour=torch.cat((ext_w_tohour,ext_d_tohour,ext_r_tohour),1)#torch.Size([16, 6, 108])
 
-        # print('890-')
-        # print(ext_toweek.shape)
-        # print(ext_tohour.shape)
+        ext_toweek=torch.cat((ext_w_toweek,ext_d_toweek,ext_r_toweek),1)#
+        ext_tohour=torch.cat((ext_w_tohour,ext_d_tohour,ext_r_tohour),1)#
+
+        y = self.submodule(x,ext_toweek, ext_tohour)
+        y1 = y[:, :, :, 0:1]
+        y2 = y[:, :, :, 1:2]
+        y3 = y[:, :, :, 2:3]
+        y4 = y[:, :, :, 3:6]
+
+        y1 = self.conv1(y1)
+        y2 = self.conv2(y2)
+        y3 = self.conv3(y3)
+        y4 = self.conv4(y4)
 
 
-        y = self.submodule(x,ext_toweek, ext_tohour)#torch.Size([16, 256, 80, 14])
-        # print(y.shape)#torch.Size([16, 256, 69, 6])
-        y1 = y[:, :, :, 0:1]  # torch.Size([16, 64, 80, 2])
-        y2 = y[:, :, :, 1:2]  # torch.Size([16, 64, 80, 6])
-        y3 = y[:, :, :, 2:3]  # torch.Size([16, 64, 80, 6])
-        y4 = y[:, :, :, 3:6]  # torch.Size([16, 64, 80, 6])
-
-
-        # print('看看y1,y2,y3的形状')
-        # print(y1.shape)#torch.Size([16, 256, 69, 2])
-        # print(y2.shape)#torch.Size([16, 256, 69, 1])
-        # print(y3.shape)#torch.Size([16, 256, 69, 3])
-        # print(y4.shape)  # torch.Size([16, 256, 69, 3])
-        y1 = self.conv1(y1)  #torch.Size([16, 69, 69, 1])
-        y2 = self.conv2(y2)  #torch.Size([16, 69, 69, 1])
-        y3 = self.conv3(y3)  #torch.Size([16, 69, 69, 1])
-        y4 = self.conv4(y4)  # torch.Size([16, 69, 69, 1])
-        # print('conv')
-        # print(y1.shape)
-        # print(y2.shape)
-        # print(y3.shape)
-        # print(y4.shape)
-        # 融合y1,y2,y3
-
-        # print(y.shape)
-        return y1+y2+y3+y4  #torch.Size([16, 80, 80, 1])
+        return y1+y2+y3+y4
 
 
 
